@@ -9,12 +9,14 @@ Public License Version 2.1 (LGPL).  See LICENSE.txt for details.
 """
 
 from Products.CMFCore.utils import UniqueObject
+from Products.CMFCore.utils import getToolByName
 from OFS.SimpleItem import SimpleItem
 from Globals import InitializeClass
 from ZODB.PersistentList import PersistentList
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
 
 from datetime import datetime, timedelta
+from DateTime import DateTime
 from socket import getfqdn
 import os
 import transaction
@@ -61,6 +63,7 @@ class QueueTool(UniqueObject, SimpleItem):
 
     security = AccessControl.ClassSecurityInfo()
 
+            
     # set default time window to 1 hour
     DEFAULT_PROCESS_TIME_WINDOW = 3600
 
@@ -69,23 +72,52 @@ class QueueTool(UniqueObject, SimpleItem):
         """Initialize (singleton!) tool object."""
         # user configurable
         self.dictServers        = {}
-        self.secProcessWindow   = self.DEFAULT_PROCESS_TIME_WINDOW
+        self.secProcessWindows  = {}
+        self.secDefaultProcessWindow   = self.DEFAULT_PROCESS_TIME_WINDOW
         # unknown to the user
         self.pendingRequests    = PersistentList([])
         self.processingRequests = PersistentList([])
         log('__init__ completed.') # this no workeee???
 
+        # Dependency checkers
+
+    def printtool_dep(self, request, dep):
+        """check for the existence of the given filetype instance (objectId, Version, extenstion) newer than the given timestamp"""
+        pt = getToolByName(self,'rhaptos_print')
+        depkey,deptype,depaction,depdetail = dep
+        ptf_params  = (depdetail['objectId'],depdetail['version'],depdetail['extension'])
+        if pt.doesFileExist(*ptf_params):
+            depfile  = pt.getFile(*ptf_params)
+            if depfile.created() > depdetail['newer']:
+                return None
+        return dep
+
+    def url_dep(self, request, dep):
+        """check for bits available from the given url, with a given mimetype and newer than the given timestamp"""
+        pass
+
+    def file_dep(self, request, dep):
+        """check for the existence if a file at the given path, that is newer than the given timestamp"""
+        depkey,deptype,depaction,depdetail = dep
+        try:
+            fstat = os.stat(depdetail['path'])
+        except OSError:
+            return dep
+        if DateTime(fstat.st_ctime) > depdetail['newer']:
+            return None
+        return dep
+        
 
     security.declareProtected(ManagePermission, 'manage_queue_tool')
-    def manage_queue_tool(self, dictServers={}, secProcessWindow=DEFAULT_PROCESS_TIME_WINDOW):
+    def manage_queue_tool(self, dictServers={}, secDefaultProcessWindow=DEFAULT_PROCESS_TIME_WINDOW):
         """
         Post creation configuration.  See manage_configure_queue_tool.zpt
         """
         self.dictServers  = eval(dictServers) # string not dictionary returned
         try:
-            self.secProcessWindow = int(secProcessWindow)
+            self.secDefaultProcessWindow = int(secDefaultProcessWindow)
         except ValueError:
-            self.secProcessWindow = self.DEFAULT_PROCESS_TIME_WINDOW
+            self.secDefaultProcessWindow = self.DEFAULT_PROCESS_TIME_WINDOW
 
 
     security.declareProtected(ManagePermission, 'add')
@@ -93,7 +125,7 @@ class QueueTool(UniqueObject, SimpleItem):
         """
         Add a request to the Pending Queue.
         """
-        # add() acquires mutex lock.  caller is repsonsible for commiting the transaction.
+        # add() acquires mutex lock.  caller is responsible for commiting the transaction.
         mutex.acquire()
         try:
             iListIndex = self.find(key, self.pendingRequests)
@@ -159,7 +191,7 @@ class QueueTool(UniqueObject, SimpleItem):
         Get a request from the pending queue and put it in the processing queue or
         get an request already in the processing queue via key.
         """
-        # caller must acquire mutex lock.  caller is repsonsible for commiting the transaction.
+        # caller must acquire mutex lock.  caller is responsible for commiting the transaction.
         if key is None:
             # get a request from the pending queue and put it in the processing queue
             if self.gotRequest():
@@ -184,7 +216,7 @@ class QueueTool(UniqueObject, SimpleItem):
         """
         Start processing the queued request.
         """
-        # start() acquires mutex lock and is repsonsible for commiting the transaction.
+        # start() acquires mutex lock and is responsible for commiting the transaction.
         return
 
 
@@ -193,7 +225,7 @@ class QueueTool(UniqueObject, SimpleItem):
         """
         Stop processing the queued request.
         """
-        # stop() acquires mutex lock and is repsonsible for commiting the transaction.
+        # stop() acquires mutex lock and is responsible for commiting the transaction.
         mutex.acquire()
         try:
             self.removeRequest(key)
@@ -216,14 +248,16 @@ class QueueTool(UniqueObject, SimpleItem):
 
 
     security.declarePrivate('removeRequest')
-    def removeRequest(self, key):
+    def removeRequest(self, key, fromList=None):
         """
         Remove a request from the processing queue.
         """
-        # caller must acquire mutex lock.  caller is repsonsible for commiting the transaction.
-        iListIndex = self.find(key, self.processingRequests)
+        # caller must acquire mutex lock.  caller is responsible for commiting the transaction.
+        if not fromList:
+            fromList = self.processingRequests
+        iListIndex = self.find(key, fromList)
         if iListIndex is not None:
-            del self.processingRequests[iListIndex]
+            del fromList[iListIndex]
 
 
     security.declarePrivate('cleanupProcessing')
@@ -233,28 +267,26 @@ class QueueTool(UniqueObject, SimpleItem):
         do not complete in a defined time window cored and did not call removeRequest().
         """
         # cleanupProcessing() acquires mutex lock and is responsible for commiting the transaction.
-        portal = self.portal_url.getPortalObject()
-
         mutex.acquire()
         try:
             timeNow = datetime.now()
             bChanged = False
             for request in self.processingRequests:
                 timeProcessStarted = 'timeRequestProcessed' in request and request['timeRequestProcessed'] or None
-                childPid = request['pid'] or None
+                childPid = request.get('pid') 
                 if childPid:
                     try:
                         os.kill(childPid, 0)
                     except OSError:
                         if timeProcessStarted is not None:
-                            self._email_cleanup_message(request)
+                            self._email_cleanup_message(request,0)
                             bChanged = True
 
                 if timeProcessStarted is not None:
                     timeProcessing = timeNow - timeProcessStarted
-                    timeProcessingMax = timedelta(seconds=self.secProcessWindow)
+                    timeProcessingMax = timedelta(seconds=self._getProcessingMax(request))
                     if timeProcessing > timeProcessingMax:
-                       self._email_cleanup_message(request)
+                       self._email_cleanup_message(request,timeProcessingMax)
                        bChanged = True
 
             if bChanged:
@@ -263,8 +295,17 @@ class QueueTool(UniqueObject, SimpleItem):
         finally:
             mutex.release()
 
+    
+    security.declarePrivate('_get_ProcessingMax')
+    def _getProcessingMax(self,request):
+        # Get process max timeout, checking for exact queue key, keyclass, and default, in that order.
+        key = request['key']
+        key_class = key.split('_')[0]
+        windows = self.secProcessWindows
+        return windows.get(key, windows.get(key_class, self.secDefaultProcessWindow))
+    
     security.declarePrivate('_email_cleanup_message')
-    def _email_cleanup_message(self,request):
+    def _email_cleanup_message(self,request,timeout):
         # email techsupport to notify that request has been forcibly been removed from the queue
         mailhost = self.MailHost
         portal = self.portal_url.getPortalObject()
@@ -272,11 +313,20 @@ class QueueTool(UniqueObject, SimpleItem):
         mto   = portal.getProperty('techsupport_email_address') or mfrom
         if mto:
             subject = "Request '%s' was forcibly removed from processing queue." % request['key']
-            messageText = "The request did not successfully complete within the required time window.  The request may have crashed, may be in an infinite loop, or may just be taking a really long time.\n\nThe server and pid referenced in the request need to be checked to see if the process is still active.  If still active, the process may need to be killed.  The QueueTool will no longer consider this an active request.\n\nThe complete request was:\n\n%s\n\n" % str(request)
-            mailhost.send(messageText, mto, mfrom, subject)
+            messageText = "The request did not successfully complete within the required time window of %s.  The request may have crashed, may be in an infinite loop, or may just be taking a really long time.\n\nThe server and pid referenced in the request need to be checked to see if the process is still active.  If still active, the process may need to be killed.  The QueueTool will no longer consider this an active request.\n\nThe complete request was:\n\n%s\n\n" % (timeout,str(request))
+            self._mailhost_send(messageText, mto, mfrom, subject)
+
         self.removeRequest(request['key'])
         self.processingRequests._p_changed = 1
     
+    security.declarePrivate('_mailhost_send')
+    def _mailhost_send(self, messageText, mto, mfrom, subject):
+        """attempt to send mail: log if fail"""
+        portal = self.portal_url.getPortalObject()
+        try:
+            mailhost.send(messageText, mto, mfrom, subject)
+        except:
+            portal.plone_log("Can't send email:\n\nSubject:%s\n\n%s" % (subject,messageText))
 
     security.declarePublic('ping')
     def ping(self):
@@ -291,25 +341,68 @@ class QueueTool(UniqueObject, SimpleItem):
         """
         # clockTick() acquires mutex lock and is responsible for commiting the transaction.
         mutex.acquire()
+        portal = self.portal_url.getPortalObject()
         try:
             if self.gotRequest():
                 dictRequest = self.getRequest()
-                self.launchRequest(dictRequest)
-                transaction.commit()
+                if dictRequest:
+                    unmetDepends = self.checkDepends(dictRequest)
+                    if unmetDepends:
+                        if unmetDepends[2] == 'reenqueue':
+                            key = dictRequest['key']
+                            iListIndex = self.find(key, self.processingRequests)
+                            portal.plone_log("... reenqueue request for key '%s'at index '%s' ..." % (dictRequest['key'],iListIndex))
+                            if iListIndex is not None:
+                                self.pendingRequests.append(self.processingRequests.pop(iListIndex))
+                                portal.plone_log("... QueueTool.clockTick() has reenqueued request for key '%s' for failed dependency '%s' ..." % (dictRequest['key'],str(unmetDepends)))
+                        elif unmetDepends[2] == 'fail':
+                            self._email_depend_fail(dictRequest,unmetDepends)
+                        
+                    else:
+                        self.launchRequest(dictRequest)
+                        transaction.commit()
+                        portal.plone_log("... QueueTool.clockTick() has spawned a child process for key '%s' ..." % dictRequest['key'])
 
-                portal = self.portal_url.getPortalObject()
-                portal.plone_log("... QueueTool.clockTick() has been spawned a child process for key '%s' ..." % dictRequest['key'])
         finally:
             mutex.release()
 
         # removed "expired" request in processing
         self.cleanupProcessing()
 
+    security.declarePublic('checkDepends')
+    def checkDepends(self, request):
+        """Check the request dependecies, in declared order. Return first unmet
+        one. On success of all (or no declared dependencies) return 'None'"""
+        for dep in request.get('depends',[]):
+            try:
+                checker = getattr(self,"%s_dep" % dep[1])
+                if checker(request,dep):
+                    return dep
+            except AttributeError:
+                self.portal_url.getPortalObject().plone_log('Skipping badly declared dependency: %s' % (dep,))
+                pass
+
+        return None
+                
+    security.declarePrivate('_email_depend_fail')
+    def _email_depend_fail(self,request,depend):
+        # email techsupport to notify that request has been forcibly been removed from the queue
+        mailhost = self.MailHost
+        portal = self.portal_url.getPortalObject()
+        mfrom = portal.getProperty('email_from_address')
+        mto   = portal.getProperty('techsupport_email_address') or mfrom
+        if mto:
+            subject = "Request '%s' was removed from pending queue. (dependency)" % request['key']
+            messageText = "The request declared a dependency that was not available at the time of processing.  The QueueTool will no longer consider this an active request.\n\nThe failed dependency was:\n\n%s\n\nThe complete request was:\n\n%s\n\n" % (str(depend),str(request))
+            self._mailhost_send(messageText, mto, mfrom, subject)
+        self.removeRequest(request['key'])
+        self.processingRequests._p_changed = 1
+    
     security.declarePrivate('launchRequest')
     def launchRequest(self, dictRequest):
         """ Launch the input request.
         """
-        # caller must acquire mutex lock.  caller is repsonsible for commiting the transaction.
+        # caller must acquire mutex lock.  caller is responsible for commiting the transaction.
         portal = self.portal_url.getPortalObject()
         if dictRequest is not None:
             key = dictRequest['key'] or None
@@ -367,6 +460,27 @@ class QueueTool(UniqueObject, SimpleItem):
                     transaction.commit()
                     portal.plone_log("... QueueTool.manage_cut_in_line: '%s' is cutting in line ..." % key)
                     self.REQUEST.RESPONSE.redirect('manage_overview')
+        finally:
+            mutex.release()
+        return
+
+    security.declareProtected(ManagePermission, 'manage_remove')
+    def manage_remove(self, key="", queue="pending"):
+        """Remove request from a queue list
+        """
+        # manage_cut_in_line() acquires mutex lock and is responsible for commiting the transaction.
+        mutex.acquire()
+        if queue == "pending":
+            fromList = self.pendingRequests
+        elif queue == "processing":
+            fromList = self.processingRequests
+        else:
+            return
+        try:
+            self.removeRequest(key,fromList)
+            portal = self.portal_url.getPortalObject()
+            portal.plone_log("... QueueTool.manage_remove: '%s' has been removed ..." % key)
+            self.REQUEST.RESPONSE.redirect('manage_overview')
         finally:
             mutex.release()
         return

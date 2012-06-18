@@ -40,7 +40,13 @@
                            processingRequests python:qtool.getProcessingRequests()">
       <tal:loop tal:repeat="request processingRequests">
         <tr>
-          <td tal:content="python:request['key']" />
+          <td><tal:span tal:content="python:request['key']"/><br/>
+            <form action="manage_remove">
+              <input type="hidden" name="key" value="" tal:attributes="value python:request['key']" />
+              <input type="hidden" name="queue" value="processing"/>
+              <input class="form-element" type="submit" name="trigger" value="Remove" />
+            </form>
+          </td>
           <td tal:content="python:request['timeRequestMade']" />
           <td tal:content="python:'hostName'             in request and request['hostName']             or '...'" />
           <td tal:content="python:'pid'                  in request and request['pid']                  or '...'" />
@@ -61,6 +67,11 @@
       <tal:loop tal:repeat="request pendingRequests">
         <tr>
           <td><tal:span tal:content="python:request['key']"/><br/>
+            <form action="manage_remove">
+              <input type="hidden" name="key" value="" tal:attributes="value python:request['key']" />
+              <input type="hidden" name="queue" value="pending"/>
+              <input class="form-element" type="submit" name="trigger" value="Remove" />
+            </form>
             <form action="manage_cut_in_line">
               <input type="hidden" name="key" value="" tal:attributes="value python:request['key']" />
               <input class="form-element" type="submit" name="trigger" value="Cut in Line" />
