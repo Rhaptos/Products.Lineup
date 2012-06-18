@@ -1,0 +1,86 @@
+Users of the QueueTool will need to add their print requests via a call to the QueueTool (/plone/queue_tool) method:
+
+    add(key, dictParams, requesthandler)
+
+where
+
+ * key is a unique, user defined identifier like "collxml_col10001", or "colmmzip_col10001", or "colcomplete_col10001" or "colprint_col10001" or "modexport_m10001".
+ * dictParams is python dictionary containing all of the key-value parameters that are required for the job 
+ * requesthandler is a zope control script (with a fully qualified path) that takes a single parameter and that implemented the job. 
+ * Periodically the QueueTool will be checked to see if there is an available request. Finding an avialable request, a zope control child process will be launched.
+
+
+The zope control script will need to look like this:
+
+import sys
+import transaction
+
+from Products.CMFCore.utils import getToolByName
+
+if len(sys.argv) < 2:
+    print "The script requires one parameter for the request key."
+    sys.exit(0xDEADBEEF)
+
+key = sys.argv[1]
+
+portal = app.objectValues(['Plone Site','CMF Site'])[0]
+qtool = getToolByName(portal, "queue_tool") # app.plone.queue_tool
+
+dictRequest = qtool.getRequest(key)
+if dictRequest is not None:
+   transaction.commit(); qtool.start(key); transaction.commit()
+
+   try:
+       # user specific logic to handle request, 
+       # with parameters in dictRequest
+   except:
+       pass
+
+   transaction.commit(); qtool.stop(key); transaction.commit()
+else:
+    print "Could not find the request from the input request key."
+    sys.exit(0xDEADBEEF)
+
+
+The Queue will need to checked periodically to see if a request can be processed. This check can be performed by a chron job (Unix solution), a NT Service (Windows solution), or Zope ClockServer 0.1 (Zope/Plone solution). The QueueTool (/plone/queue_tool) method clockTick() will need to be called.
+
+Zope ClockServer 0.1 can be found here:
+
+http://www.contentmanagementsoftware.info/zope/ClockServer
+
+The following changed will need to be made to the zope.conf:
+
+%import Products.ClockServer
+      <clock-server>
+          method /plone/queue_tool/clockTick
+          period 3
+          user
+          password
+       </clock-server>
+
+Note that user is not specified and the implied user is thus Anonymous.
+
+(The latest version Zope ClockServer, 0.2, requires a later version of the Five Product version 1.4.4 instead version 1.3.10, which is what we installed for Zope 2.9.8. See http://markmail.org/message/epnn4h6bry3rhwek and followup.)
+
+By default, a Zope instance handling requests will only process one at a time. Mutli-cored hosts may be able to process multiple requests at a time. The QueueTool (/plone/queue_tool) can be configured to allow more processes per host to be run. QueueTool has an internal data member dictServers which is populated like:
+
+{'boole': 4, 'stevens': 2}
+
+In this instance, the host 'boole' can have 4 queue jobs running at once and 'stevens' can have 2 jobs.
+
+In ZMI, dictServers can be set via going to the queue_tool product, looking at the Configure tab, changing the value and clicking the Save button. This value could also be set at instance creation time via a Zope control script.
+
+CMFSquidTool
+
+We indirectly encountered a problem between the two products, Lineup (which contains QueueTool) and CMFSquidTool version 1.5.  The zope control scripts launched via QueueTool can hang on exit.  The zope control scripts have a hidden thread started by CMFSquidTool, which never completes and causes the script to never exit.
+This is because CMFSquidTool expects to be a long-lived process.
+
+Our intent was to never run QueueTool on a live instance, but on an instance which did not serve web pages to our users.  The jobs performed by the zope control scripts launched via QueueTool tend to CPU and memory intensive.  The QueueTool provides a mechanism to control server load, while QueueTool deployment to a non-user facing instance shields our users from performance degradation.
+
+To get around this, we call a function that explicitly kills all threads. 
+
+This product requires the following steps to be done to get it working correctly:
+ * Create a new Rhaptos instance or use an existing instance
+ * Add the ClockServer product to the given instance (which requires 'make' to be run), if needed
+ * Modifies the given instance's zope.conf (see above) to link the ClockServer with the QueueTool
+ * Modifies the given instance's zope.conf (see above) to disable the http-server and icp-server

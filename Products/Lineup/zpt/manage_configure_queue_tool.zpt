@@ -1,0 +1,55 @@
+<html tal:omit-tag="">
+  <tal:comment tal:replace="nothing">
+  	This template is used to modify properties for the QueueTool.
+  </tal:comment>
+  <span tal:replace="structure here/manage_page_header">Header</span>
+  <span tal:define="manage_tabs_message options/manage_tabs_message | nothing"
+    tal:replace="structure here/manage_tabs">Tabs</span>
+
+  <h3>Manage Queue Tool</h3>
+
+  <p class="form-help">
+   
+  </p>
+
+  <form method="post" tal:attributes="action request/URL1">
+  <table cellspacing="0" cellpadding="2" border="0">
+    <tr>
+      <td align="left" valign="top">
+      <div class="form-optional">
+      Workers per Server
+      </div>
+      </td>
+      <td align="left" valign="top">
+      <input type="text" name="dictServers" size="40" value=""
+             tal:attributes="value python:here.dictServers"/>
+          (Python dictionary which matches server names with maximun workers, for example {'smallServer':2, 'bigServer':4}.)
+      </td>
+    </tr>
+    <tr>
+      <td align="left" valign="top">
+      <div class="form-optional">
+      Time Window in seconds
+      </div>
+      </td>
+      <td align="left" valign="top">
+      <input type="text" name="secProcessWindow" size="40" value=""
+             tal:attributes="value python:here.secProcessWindow"/>
+          Time Window in seconds, within which worker child process is expected to finish.
+      </td>
+    </tr>
+    <tr>
+      <td align="left" valign="top">
+      </td>
+      <td align="left" valign="top">
+      <div class="form-element">
+      <input class="form-element" type="submit" name="manage_queue_tool:method"
+      value=" Save Changes " />
+      </div>
+      </td>
+    </tr>
+  </table>
+  </form>
+
+  <span tal:replace="structure here/manage_page_footer">Footer</span>
+</html>

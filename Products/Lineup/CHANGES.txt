@@ -1,0 +1,9 @@
+Lineup-0.3
+  - additional param for requested server name
+  - detect and remove dead children
+
+Lineup-0.2
+  - rework transaction processing in the queue
+
+Lineup-0.1
+  - initial version; collection-structure-redesign-1 (Oct. 22, 2009)

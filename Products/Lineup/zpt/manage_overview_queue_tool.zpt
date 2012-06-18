@@ -1,0 +1,83 @@
+<html xmlns="http://www.w3.org/1999/xhtml" 
+      xmlns:metal="http://xml.zope.org/namespaces/metal" 
+      xmlns:tal="http://xml.zope.org/namespaces/tal" 
+      xmlns:i18n="http://xml.zope.org/namespaces/i18n" tal:omit-tag="">
+  <span tal:replace="structure here/manage_page_header">Header</span>
+  <span tal:define="manage_tabs_message options/manage_tabs_message | nothing"
+    tal:replace="structure here/manage_tabs">Tabs</span>
+
+  <tal:comment tal:replace="nothing">
+      This template is used to display information about the Lineup QueueTool in ZMI.
+  </tal:comment>
+
+  <h3> <code>queue_tool</code> </h3>
+  <form action="manage_overview">
+    <input type="submit" name="trigger" value="Refresh" />
+  </form>
+
+  <p>
+      This tool provides a queue mechanism to asynchronously process PDF/zip file generation requests.
+  </p>
+
+  <form action="manage_tick">
+    <input type="submit" name="trigger" value="Manually Request Processing" />
+  </form>
+
+  <table border="1">
+    <tr>
+        <th>KEY</th>
+        <th>Request Made</th>
+        <th>Host</th>
+        <th>Process ID</th>
+        <th>Processing Started</th>
+        <th>Full Request</th>
+    </tr>
+
+    <tr>
+      <td colspan="6" style="text-align:center; background-color:#eeeeee">Processing</td>
+    </tr>
+    <tal:block tal:define="qtool python:modules['Products.CMFCore.utils'].getToolByName(here, 'queue_tool');
+                           processingRequests python:qtool.getProcessingRequests()">
+      <tal:loop tal:repeat="request processingRequests">
+        <tr>
+          <td tal:content="python:request['key']" />
+          <td tal:content="python:request['timeRequestMade']" />
+          <td tal:content="python:'hostName'             in request and request['hostName']             or '...'" />
+          <td tal:content="python:'pid'                  in request and request['pid']                  or '...'" />
+          <td tal:content="python:'timeRequestProcessed' in request and request['timeRequestProcessed'] or '...'" />
+          <td tal:content="python:str(request)" />
+        </tr>
+      </tal:loop>
+      <tr tal:condition="not:processingRequests">
+        <td colspan="6"><em>none</em></td>
+      </tr>
+    </tal:block>
+
+    <tr>
+      <td colspan="6" style="text-align:center; background-color:#eeeeee">Pending</td>
+    </tr>
+    <tal:block tal:define="qtool python:modules['Products.CMFCore.utils'].getToolByName(here, 'queue_tool');
+                           pendingRequests python:qtool.getPendingRequests()">
+      <tal:loop tal:repeat="request pendingRequests">
+        <tr>
+          <td><tal:span tal:content="python:request['key']"/><br/>
+            <form action="manage_cut_in_line">
+              <input type="hidden" name="key" value="" tal:attributes="value python:request['key']" />
+              <input class="form-element" type="submit" name="trigger" value="Cut in Line" />
+            </form>
+          </td>
+          <td tal:content="python:request['timeRequestMade']" />
+          <td>...</td>
+          <td>...</td>
+          <td>...</td>
+          <td tal:content="python:str(request)" />
+        </tr>
+      </tal:loop>
+      <tr tal:condition="not:pendingRequests">
+        <td colspan="6"><em>none</em></td>
+      </tr>
+    </tal:block>
+  </table>
+
+  <span tal:replace="structure here/manage_page_footer">Footer</span>
+</html>
