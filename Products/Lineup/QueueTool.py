@@ -109,11 +109,12 @@ class QueueTool(UniqueObject, SimpleItem):
         
 
     security.declareProtected(ManagePermission, 'manage_queue_tool')
-    def manage_queue_tool(self, dictServers={}, secDefaultProcessWindow=DEFAULT_PROCESS_TIME_WINDOW):
+    def manage_queue_tool(self, dictServers={}, dictProcessWindows={}, secDefaultProcessWindow=DEFAULT_PROCESS_TIME_WINDOW):
         """
         Post creation configuration.  See manage_configure_queue_tool.zpt
         """
         self.dictServers  = eval(dictServers) # string not dictionary returned
+        self.secProcessWindows  = eval(dictProcessWindows) # string not dictionary returned
         try:
             self.secDefaultProcessWindow = int(secDefaultProcessWindow)
         except ValueError:

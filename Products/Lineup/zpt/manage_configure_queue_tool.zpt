@@ -29,6 +29,18 @@
     <tr>
       <td align="left" valign="top">
       <div class="form-optional">
+      Process Window Timeouts
+      </div>
+      </td>
+      <td align="left" valign="top">
+      <input type="text" name="dictProcessWindows" size="40" value=""
+             tal:attributes="value python:here.secProcessWindows"/>
+          (Python dictionary which matches queue keys (and key classes) with maximun timeouts in seconds, for example {'collxml':120, 'colprint_col10001':7200}.)
+      </td>
+    </tr>
+    <tr>
+      <td align="left" valign="top">
+      <div class="form-optional">
       Time Window in seconds
       </div>
       </td>
