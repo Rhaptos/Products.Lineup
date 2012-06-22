@@ -1,3 +1,6 @@
+Lineup-0.4
+  - implement declared external dependencies for queued jobs
+
 Lineup-0.3
   - additional param for requested server name
   - detect and remove dead children
