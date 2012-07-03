@@ -87,8 +87,8 @@ class QueueTool(UniqueObject, SimpleItem):
         depkey,deptype,depaction,depdetail = dep
         ptf_params  = (depdetail['objectId'],depdetail['version'],depdetail['extension'])
         if pt.doesFileExist(*ptf_params):
-            depfile  = pt.getFile(*ptf_params)
-            if depfile.created() > depdetail['newer']:
+            mod_date  = DateTime(pt.getModificationDate(*ptf_params))
+            if mod_date > depdetail['newer']:
                 return None
         return dep
 
