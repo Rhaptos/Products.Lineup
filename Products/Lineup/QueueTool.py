@@ -356,12 +356,13 @@ class QueueTool(UniqueObject, SimpleItem):
                             if iListIndex is not None:
                                 self.pendingRequests.append(self.processingRequests.pop(iListIndex))
                                 portal.plone_log("... QueueTool.clockTick() has reenqueued request for key '%s' for failed dependency '%s' ..." % (dictRequest['key'],str(unmetDepends)))
+                                transaction.commit() 
                         elif unmetDepends[2] == 'fail':
                             self._email_depend_fail(dictRequest,unmetDepends)
                         
                     else:
+                        transaction.commit() # make list change visible to child instance - other way was race condition
                         self.launchRequest(dictRequest)
-                        transaction.commit()
                         portal.plone_log("... QueueTool.clockTick() has spawned a child process for key '%s' ..." % dictRequest['key'])
 
         finally:
