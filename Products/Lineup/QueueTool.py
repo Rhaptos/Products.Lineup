@@ -170,7 +170,8 @@ class QueueTool(UniqueObject, SimpleItem):
     security.declarePrivate('gotRequest')
     def gotRequest(self):
         """
-        Determine if any requests are ready for processing.
+        Determine if any requests are ready for processing. Return key of first one, if any, else False.
+        Does dependency checking
         """
         # requests must be pending ...
         if len(self.pendingRequests) == 0:
@@ -184,7 +185,25 @@ class QueueTool(UniqueObject, SimpleItem):
             if len(listHostProcess) >= iProcessMax:
                 return False
 
-        return True
+        # check requests for dependencies, bail out at first success
+        for dictRequest in self.pendingRequests:
+            key = dictRequest['key']
+            unmetDepends = self.checkDepends(dictRequest)
+            if unmetDepends:
+                if unmetDepends[2] == 'reenqueue':
+                    iListIndex = self.find(key, self.pendingRequests)
+                    portal.plone_log("... reenqueue request for key '%s'at index '%s' ..." % (dictRequest['key'],iListIndex))
+                    if iListIndex is not None:
+                        portal.plone_log("... QueueTool.clockTick() has skipped request for key '%s' for failed dependency '%s' ..." % (dictRequest['key'],str(unmetDepends)))
+                elif unmetDepends[2] == 'fail':
+                    self._email_depend_fail(dictRequest,unmetDepends) # removes req from pending as well
+                else:
+                    portal.plone_log("... unknown failed dependency action for key '%s' ... skipping." % (dictRequest['key'],))
+            else:
+                return key
+            
+        # fell through loop: no requests w/o unmet dependencies
+        return False
 
     security.declarePrivate('getRequest')
     def getRequest(self, key=None):
@@ -195,11 +214,16 @@ class QueueTool(UniqueObject, SimpleItem):
         # caller must acquire mutex lock.  caller is responsible for commiting the transaction.
         if key is None:
             # get a request from the pending queue and put it in the processing queue
-            if self.gotRequest():
-                dictRequest = self.pendingRequests[0]
-                del self.pendingRequests[0]
-                self.processingRequests.append(dictRequest)
-                return dictRequest
+            reqKey = self.gotRequest():
+            if reqKey:
+                iListIndex = self.find(reqKey, pendingRequests)
+                if iListIndex is not None:
+                    dictRequest = self.pendingRequests[iListIndex]
+                    del self.pendingRequests[iListIndex]
+                    self.processingRequests.append(dictRequest)
+                    return dictRequest
+                else:
+                    return None
             else:
                 return None
         else:
@@ -347,19 +371,6 @@ class QueueTool(UniqueObject, SimpleItem):
             if self.gotRequest():
                 dictRequest = self.getRequest()
                 if dictRequest:
-                    unmetDepends = self.checkDepends(dictRequest)
-                    if unmetDepends:
-                        if unmetDepends[2] == 'reenqueue':
-                            key = dictRequest['key']
-                            iListIndex = self.find(key, self.processingRequests)
-                            portal.plone_log("... reenqueue request for key '%s'at index '%s' ..." % (dictRequest['key'],iListIndex))
-                            if iListIndex is not None:
-                                self.pendingRequests.append(self.processingRequests.pop(iListIndex))
-                                portal.plone_log("... QueueTool.clockTick() has reenqueued request for key '%s' for failed dependency '%s' ..." % (dictRequest['key'],str(unmetDepends)))
-                        elif unmetDepends[2] == 'fail':
-                            self._email_depend_fail(dictRequest,unmetDepends)
-                        
-                    else:
                         self.launchRequest(dictRequest)
                         transaction.commit()
                         portal.plone_log("... QueueTool.clockTick() has spawned a child process for key '%s' ..." % dictRequest['key'])
@@ -396,8 +407,8 @@ class QueueTool(UniqueObject, SimpleItem):
             subject = "Request '%s' was removed from pending queue. (dependency)" % request['key']
             messageText = "The request declared a dependency that was not available at the time of processing.  The QueueTool will no longer consider this an active request.\n\nThe failed dependency was:\n\n%s\n\nThe complete request was:\n\n%s\n\n" % (str(depend),str(request))
             self._mailhost_send(messageText, mto, mfrom, subject)
-        self.removeRequest(request['key'])
-        self.processingRequests._p_changed = 1
+        self.removeRequest(request['key'], self.pendingRequests)
+        self.pendingRequests._p_changed = 1
     
     security.declarePrivate('launchRequest')
     def launchRequest(self, dictRequest):
