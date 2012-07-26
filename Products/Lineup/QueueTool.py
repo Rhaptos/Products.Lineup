@@ -217,7 +217,7 @@ class QueueTool(UniqueObject, SimpleItem):
             # get a request from the pending queue and put it in the processing queue
             reqKey = self.gotRequest()
             if reqKey:
-                iListIndex = self.find(reqKey, pendingRequests)
+                iListIndex = self.find(reqKey, self.pendingRequests)
                 if iListIndex is not None:
                     dictRequest = self.pendingRequests[iListIndex]
                     del self.pendingRequests[iListIndex]
