@@ -185,6 +185,7 @@ class QueueTool(UniqueObject, SimpleItem):
             if len(listHostProcess) >= iProcessMax:
                 return False
 
+        portal = self.portal_url.getPortalObject()
         # check requests for dependencies, bail out at first success
         for dictRequest in self.pendingRequests:
             key = dictRequest['key']
@@ -214,7 +215,7 @@ class QueueTool(UniqueObject, SimpleItem):
         # caller must acquire mutex lock.  caller is responsible for commiting the transaction.
         if key is None:
             # get a request from the pending queue and put it in the processing queue
-            reqKey = self.gotRequest():
+            reqKey = self.gotRequest()
             if reqKey:
                 iListIndex = self.find(reqKey, pendingRequests)
                 if iListIndex is not None:
