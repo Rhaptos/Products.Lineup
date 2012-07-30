@@ -1,3 +1,6 @@
+Lineup-0.5
+  - move and modify dependency checking to avoid problem w/ spinning unmet dep request
+
 Lineup-0.4.1
   - explicit transactional control to avoid a race condition w/ children
 
