@@ -23,7 +23,7 @@
       <td align="left" valign="top">
       <input type="text" name="dictServers" size="40" value=""
              tal:attributes="value python:here.dictServers"/>
-          (Python dictionary which matches server names with maximun workers, for example {'smallServer':2, 'bigServer':4}.)
+          (Python dictionary which matches server names with maximum workers, for example {'smallServer':2, 'bigServer':4}.)
       </td>
     </tr>
     <tr>
@@ -35,7 +35,7 @@
       <td align="left" valign="top">
       <input type="text" name="dictProcessWindows" size="40" value=""
              tal:attributes="value python:here.secProcessWindows"/>
-          (Python dictionary which matches queue keys (and key classes) with maximun timeouts in seconds, for example {'collxml':120, 'colprint_col10001':7200}.)
+          (Python dictionary which matches queue keys (and key classes) with maximum timeouts in seconds, for example {'collxml':120, 'colprint_col10001':7200}.)
       </td>
     </tr>
     <tr>
