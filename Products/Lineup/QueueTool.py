@@ -23,6 +23,8 @@ import transaction
 import AccessControl
 from threading import Lock
 
+import rpush
+
 # from getipaddr import getipaddr
 
 ManagePermission = 'View management screens'
@@ -40,11 +42,20 @@ ManagePermission = 'View management screens'
 # which performs the work.  the child at startup calls QueueTool.start() which updates the request.
 # the child at exit calls QueueTool.stop() which removes the request from processingRequests queue.
 
+
+TYPE_SPECIFIERS = {
+    # type: (suite, format),
+    'complete': ('latex', 'completezip'),
+    'print': ('princexml', 'pdf'),
+    'xml': ('latex', 'offline'),
+    }
+
 mutex = Lock()
 
 import zLOG
 def log(msg, severity=zLOG.INFO):
     zLOG.LOG("QueueTool: ", severity, msg)
+
 
 class QueueTool(UniqueObject, SimpleItem):
     """
@@ -63,7 +74,7 @@ class QueueTool(UniqueObject, SimpleItem):
 
     security = AccessControl.ClassSecurityInfo()
 
-            
+
     # set default time window to 1 hour
     DEFAULT_PROCESS_TIME_WINDOW = 3600
 
@@ -106,7 +117,7 @@ class QueueTool(UniqueObject, SimpleItem):
         if DateTime(fstat.st_ctime) > depdetail['newer']:
             return None
         return dep
-        
+
 
     security.declareProtected(ManagePermission, 'manage_queue_tool')
     def manage_queue_tool(self, dictServers={}, dictProcessWindows={}, secDefaultProcessWindow=DEFAULT_PROCESS_TIME_WINDOW):
@@ -129,25 +140,38 @@ class QueueTool(UniqueObject, SimpleItem):
         # add() acquires mutex lock.  caller is responsible for commiting the transaction.
         mutex.acquire()
         try:
-            iListIndex = self.find(key, self.pendingRequests)
-            if iListIndex is not None:
-                # remove duplicate
-                del self.pendingRequests[iListIndex]
+            project = getattr(dictParams, 'project_name', 'cnx')
+            # Types of builds coming in are: colcomplete, colprint, colxml
+            type_specifier = key.split('_', 1)[0].lstrip('col')
+            suite, format = TYPE_SPECIFIERS[type_specifier]
 
-            dictRequest = dictParams.copy()
+            # FIXME I'd rather use collections.namedtuple here but
+            #       this is an ancient version of Python. So we'll
+            #       fudge it.
+            args= object()
+            setattr(args, 'id', dictParams['id'])
+            setattr(args, 'version', dictParams['version'])
+            setattr(args, 'uri', dictParams['serverURL'])
+            setattr(args, 'platform', 'any')
+            setattr(args, 'project', project)
+            setattr(args, 'suite', suite)
+            setattr(args, 'format', format)
 
-            dictRequest['key'] = key
-            dictRequest['requestHandler'] = callbackrequesthandler
-            dictRequest['timeRequestMade'] = datetime.now()
-            dictRequest['priority'] = priority
-            # Walk list, insert immediately before first entry that is lower priority (higher value)
-            for i,req in enumerate(self.pendingRequests):
-                if req['priority'] > priority:
-                    self.pendingRequests.insert(i,req)
-                    break
-            else: 
-                # didn't find one, tack on the end
-                self.pendingRequests.append(dictRequest)
+            rpush.create_job(args)
+
+            # FIXME Removed due to inability to prioritize in a linear
+            #       (non-topic based) message queue implemenation.
+            # Walk list, insert immediately before first entry that is
+            #   lower priority (higher value)
+            ##dictRequest['priority'] = priority
+            ##for i,req in enumerate(self.pendingRequests):
+            ##    if req['priority'] > priority:
+            ##        self.pendingRequests.insert(i,req)
+            ##        break
+            ##else:
+            ##    # didn't find one, tack on the end
+            ##    self.pendingRequests.append(dictRequest)
+
             # note that we explicitly and purposely do not commit the transaction here.
             # the caller is likely to be in a module/collection publish transaction.
             # when the caller's transaction commits, the QueueTool change (i.e. adding
@@ -202,7 +226,7 @@ class QueueTool(UniqueObject, SimpleItem):
                     portal.plone_log("... unknown failed dependency action for key '%s' ... skipping." % (dictRequest['key'],))
             else:
                 return key
-            
+
         # fell through loop: no requests w/o unmet dependencies
         return False
 
@@ -299,7 +323,7 @@ class QueueTool(UniqueObject, SimpleItem):
             bChanged = False
             for request in self.processingRequests:
                 timeProcessStarted = 'timeRequestProcessed' in request and request['timeRequestProcessed'] or None
-                childPid = request.get('pid') 
+                childPid = request.get('pid')
                 if childPid:
                     try:
                         os.kill(childPid, 0)
@@ -321,7 +345,7 @@ class QueueTool(UniqueObject, SimpleItem):
         finally:
             mutex.release()
 
-    
+
     security.declarePrivate('_get_ProcessingMax')
     def _getProcessingMax(self,request):
         # Get process max timeout, checking for exact queue key, keyclass, and default, in that order.
@@ -329,7 +353,7 @@ class QueueTool(UniqueObject, SimpleItem):
         key_class = key.split('_')[0]
         windows = self.secProcessWindows
         return windows.get(key, windows.get(key_class, self.secDefaultProcessWindow))
-    
+
     security.declarePrivate('_email_cleanup_message')
     def _email_cleanup_message(self,request,timeout):
         # email techsupport to notify that request has been forcibly been removed from the queue
@@ -344,7 +368,7 @@ class QueueTool(UniqueObject, SimpleItem):
 
         self.removeRequest(request['key'])
         self.processingRequests._p_changed = 1
-    
+
     security.declarePrivate('_mailhost_send')
     def _mailhost_send(self, messageText, mto, mfrom, subject):
         """attempt to send mail: log if fail"""
@@ -396,7 +420,7 @@ class QueueTool(UniqueObject, SimpleItem):
                 pass
 
         return None
-                
+
     security.declarePrivate('_email_depend_fail')
     def _email_depend_fail(self,request,depend):
         # email techsupport to notify that request has been forcibly been removed from the queue
@@ -410,7 +434,7 @@ class QueueTool(UniqueObject, SimpleItem):
             self._mailhost_send(messageText, mto, mfrom, subject)
         self.removeRequest(request['key'], self.pendingRequests)
         self.pendingRequests._p_changed = 1
-    
+
     security.declarePrivate('launchRequest')
     def launchRequest(self, dictRequest):
         """ Launch the input request.
