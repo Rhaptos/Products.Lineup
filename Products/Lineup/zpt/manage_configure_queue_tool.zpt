@@ -52,6 +52,50 @@
     </tr>
     <tr>
       <td align="left" valign="top">
+      <div class="form-optional">
+        PyBit hostname
+      </div>
+      </td>
+      <td align="left" valign="top">
+      <input type="text" name="pybitHostname" size="40" value=""
+             tal:attributes="value python:here.pybitHostname | nothing"/>
+        The hostname for the CNX-PyBit enabled instance.
+    </tr>
+    <tr>
+      <td align="left" valign="top">
+      <div class="form-optional">
+        PyBit port
+      </div>
+      </td>
+      <td align="left" valign="top">
+      <input type="text" name="pybitPort" size="40" value=""
+             tal:attributes="value python:here.pybitPort | nothing"/>
+        The port number for the CNX-PyBit enabled instance.
+    </tr>
+    <tr>
+      <td align="left" valign="top">
+      <div class="form-optional">
+        PyBit username
+      </div>
+      </td>
+      <td align="left" valign="top">
+      <input type="text" name="pybitHostname" size="40" value=""
+             tal:attributes="value python:here.pybitUsername | nothing"/>
+        The username for the CNX-PyBit enabled instance.
+    </tr>
+    <tr>
+      <td align="left" valign="top">
+      <div class="form-optional">
+        PyBit password
+      </div>
+      </td>
+      <td align="left" valign="top">
+      <input type="password" name="pybitHostname" size="40" value=""
+             tal:attributes="value python:here.pybitPassword | nothing"/>
+        The password for the CNX-PyBit enabled instance.
+    </tr>
+    <tr>
+      <td align="left" valign="top">
       </td>
       <td align="left" valign="top">
       <div class="form-element">

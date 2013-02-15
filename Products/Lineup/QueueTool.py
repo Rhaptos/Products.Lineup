@@ -19,11 +19,11 @@ from datetime import datetime, timedelta
 from DateTime import DateTime
 from socket import getfqdn
 import os
+import httplib2
 import transaction
 import AccessControl
 from threading import Lock
-
-import rpush
+import simplejson as json
 
 # from getipaddr import getipaddr
 
@@ -55,6 +55,25 @@ mutex = Lock()
 import zLOG
 def log(msg, severity=zLOG.INFO):
     zLOG.LOG("QueueTool: ", severity, msg)
+
+# XXX Modified clone of rbit's rpush.create_job functionality.
+#     We are required to clone it because rpush is not backwards
+#     compatible and should not be dumbed down to do so.
+def create_job(host, port, creds=('admin', 'pass'), data):
+    """Creates a job request in PyBit"""
+    url = "http://%s:%s/api/job/" % (host, port)
+    data = json.dumps(data)
+    http = httplib2.Http()
+    http.add_credentials(*creds)
+    headers = {'Content-type': 'application/json'}
+    response, content = http.request(url, 'POST', data, headers=headers)
+
+    if response['status'] != 200:
+        raise Exception("Failed to add the package with the following data:"
+                        "\ndata: %s"
+                        "\nresponse status: %s"
+                        "\nresponse body: %s" \
+                        % (data, response['status'], content))
 
 
 class QueueTool(UniqueObject, SimpleItem):
@@ -145,19 +164,20 @@ class QueueTool(UniqueObject, SimpleItem):
             type_specifier = key.split('_', 1)[0].lstrip('col')
             suite, format = TYPE_SPECIFIERS[type_specifier]
 
-            # FIXME I'd rather use collections.namedtuple here but
-            #       this is an ancient version of Python. So we'll
-            #       fudge it.
-            args= object()
-            setattr(args, 'id', dictParams['id'])
-            setattr(args, 'version', dictParams['version'])
-            setattr(args, 'uri', dictParams['serverURL'])
-            setattr(args, 'platform', 'any')
-            setattr(args, 'project', project)
-            setattr(args, 'suite', suite)
-            setattr(args, 'format', format)
-
-            rpush.create_job(args)
+            data = {'package': dictParams['id'],
+                    'version': dictParams['version'],
+                    'uri': dictParams['serverURL'],
+                    'arch': 'any',
+                    'dist': project,
+                    'suite': suite,
+                    'format': format,
+                    }
+            host = getattr(self, 'pybitHostname', 'localhost')
+            port = getattr(self, 'pybitPort', 8091)
+            username = getattr(self, 'pybitUsername', 'admin')
+            password = getattr(self, 'pybitPassword', 'pass')
+            creds = (username, password)
+            create_job(host, port, creds, data)
 
             # FIXME Removed due to inability to prioritize in a linear
             #       (non-topic based) message queue implemenation.
