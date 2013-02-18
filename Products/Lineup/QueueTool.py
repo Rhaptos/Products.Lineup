@@ -150,18 +150,61 @@ class QueueTool(UniqueObject, SimpleItem):
         except ValueError:
             self.secDefaultProcessWindow = self.DEFAULT_PROCESS_TIME_WINDOW
 
-
-    security.declareProtected(ManagePermission, 'add')
-    def add(self, key, dictParams, callbackrequesthandler, priority=1):
+    # BBB Backwards compatible for incremental addition of message handlers.
+    security.declareProtected(ManagePermission, 'BBB_add')
+    def BBB_add(self, key, dictParams, callbackrequesthandler, priority=1):
         """
         Add a request to the Pending Queue.
         """
         # add() acquires mutex lock.  caller is responsible for commiting the transaction.
         mutex.acquire()
         try:
-            project = getattr(dictParams, 'project_name', 'cnx')
-            # Types of builds coming in are: colcomplete, colprint, colxml
-            type_specifier = key.split('_', 1)[0].lstrip('col')
+            iListIndex = self.find(key, self.pendingRequests)
+            if iListIndex is not None:
+                # remove duplicate
+                del self.pendingRequests[iListIndex]
+
+            dictRequest = dictParams.copy()
+
+            dictRequest['key'] = key
+            dictRequest['requestHandler'] = callbackrequesthandler
+            dictRequest['timeRequestMade'] = datetime.now()
+            dictRequest['priority'] = priority
+            # Walk list, insert immediately before first entry that is lower priority (higher value)
+            for i,req in enumerate(self.pendingRequests):
+                if req['priority'] > priority:
+                    self.pendingRequests.insert(i,req)
+                    break
+            else:
+                # didn't find one, tack on the end
+                self.pendingRequests.append(dictRequest)
+            # note that we explicitly and purposely do not commit the transaction here.
+            # the caller is likely to be in a module/collection publish transaction.
+            # when the caller's transaction commits, the QueueTool change (i.e. adding
+            # a request) will also commit.  thus, the request can not be processed until
+            # after the publish transaction has completed (i.e. no race condition).
+        finally:
+            mutex.release()
+
+    security.declareProtected(ManagePermission, 'add')
+    def add(self, key, dictParams, callbackrequesthandler, priority=1):
+        """
+        Add a request to the Pending Queue.
+        """
+        project = getattr(dictParams, 'project_name', 'cnx')
+        # Types of builds coming in are: colcomplete, colprint, colxml
+        type_specifier = key.split('_', 1)[0].lstrip('col')
+
+        # XXX Temporary measure to incrementally develop the
+        #     message handlers that produces offline xml and complete zip.
+        if type_specifier in ('complete', 'xml'):
+            self.BBB_add(key, dictParams, callbackrequesthandler, priority=1)
+            return
+
+        # add() acquires mutex lock.
+        # caller is responsible for commiting the transaction.
+        mutex.acquire()
+        try:
             suite, format = TYPE_SPECIFIERS[type_specifier]
 
             data = {'package': dictParams['id'],
