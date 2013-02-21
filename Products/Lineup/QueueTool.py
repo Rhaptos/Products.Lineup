@@ -68,7 +68,7 @@ def create_job(host, port, data, creds=('admin', 'pass')):
     headers = {'Content-type': 'application/json'}
     response, content = http.request(url, 'POST', data, headers=headers)
 
-    if response['status'] != 200:
+    if response['status'] != '200':
         raise Exception("Failed to add the package with the following data:"
                         "\ndata: %s"
                         "\nresponse status: %s"
