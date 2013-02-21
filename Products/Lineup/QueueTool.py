@@ -47,7 +47,7 @@ TYPE_SPECIFIERS = {
     # type: (suite, format),
     'complete': ('latex', 'completezip'),
     'print': ('princexml', 'pdf'),
-    'xml': ('latex', 'offline'),
+    'lxml': ('latex', 'offline'),
     }
 
 mutex = Lock()
