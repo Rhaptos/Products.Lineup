@@ -43,7 +43,7 @@
       </div>
       </td>
       <td align="left" valign="top">
-      <input type="text" name="pybitHostname" size="40" value=""
+      <input type="text" name="pybitUsername" size="40" value=""
              tal:attributes="value here/pybitUsername | nothing"/>
         The username for the CNX-PyBit enabled instance.
     </tr>
@@ -54,7 +54,7 @@
       </div>
       </td>
       <td align="left" valign="top">
-      <input type="password" name="pybitHostname" size="40" value=""
+      <input type="password" name="pybitPassword" size="40" value=""
              tal:attributes="value here/pybitPassword | nothing"/>
         The password for the CNX-PyBit enabled instance.
     </tr>

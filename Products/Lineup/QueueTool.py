@@ -139,52 +139,15 @@ class QueueTool(UniqueObject, SimpleItem):
 
 
     security.declareProtected(ManagePermission, 'manage_queue_tool')
-    def manage_queue_tool(self, dictServers={}, dictProcessWindows={}, secDefaultProcessWindow=DEFAULT_PROCESS_TIME_WINDOW):
+    def manage_queue_tool(self, pybitHostname='', pybitPort=8080,
+                          pybitUsername='admin', pybitPassword='pass'):
         """
         Post creation configuration.  See manage_configure_queue_tool.zpt
         """
-        self.dictServers  = eval(dictServers) # string not dictionary returned
-        self.secProcessWindows  = eval(dictProcessWindows) # string not dictionary returned
-        try:
-            self.secDefaultProcessWindow = int(secDefaultProcessWindow)
-        except ValueError:
-            self.secDefaultProcessWindow = self.DEFAULT_PROCESS_TIME_WINDOW
-
-    # BBB Backwards compatible for incremental addition of message handlers.
-    security.declareProtected(ManagePermission, 'BBB_add')
-    def BBB_add(self, key, dictParams, callbackrequesthandler, priority=1):
-        """
-        Add a request to the Pending Queue.
-        """
-        # add() acquires mutex lock.  caller is responsible for commiting the transaction.
-        mutex.acquire()
-        try:
-            iListIndex = self.find(key, self.pendingRequests)
-            if iListIndex is not None:
-                # remove duplicate
-                del self.pendingRequests[iListIndex]
-
-            dictRequest = dictParams.copy()
-
-            dictRequest['key'] = key
-            dictRequest['requestHandler'] = callbackrequesthandler
-            dictRequest['timeRequestMade'] = datetime.now()
-            dictRequest['priority'] = priority
-            # Walk list, insert immediately before first entry that is lower priority (higher value)
-            for i,req in enumerate(self.pendingRequests):
-                if req['priority'] > priority:
-                    self.pendingRequests.insert(i,req)
-                    break
-            else:
-                # didn't find one, tack on the end
-                self.pendingRequests.append(dictRequest)
-            # note that we explicitly and purposely do not commit the transaction here.
-            # the caller is likely to be in a module/collection publish transaction.
-            # when the caller's transaction commits, the QueueTool change (i.e. adding
-            # a request) will also commit.  thus, the request can not be processed until
-            # after the publish transaction has completed (i.e. no race condition).
-        finally:
-            mutex.release()
+        self.pybitHostname = pybitHostname
+        self.pybitPort = int(pybitPort)
+        self.pybitUsername = pybitUsername
+        self.pybitPassword = pybitPassword
 
     security.declareProtected(ManagePermission, 'add')
     def add(self, key, dictParams, callbackrequesthandler, priority=1):
