@@ -156,27 +156,29 @@ class QueueTool(UniqueObject, SimpleItem):
         """
         project = getattr(dictParams, 'project_name', 'cnx')
         # Types of builds coming in are: colcomplete, colprint, colxml
-        type_specifier = key.split('_', 1)[0].lstrip('col')
+        build_type = key.split('_', 1)[0]
+        col_or_mod = build_type[:3]  # either 'col' or 'mod''
+        type_specifier = key.split('_', 1)[0][3:]
+        suite, format = TYPE_SPECIFIERS[type_specifier]
+
+        data = {'package': dictParams['id'],
+                'version': dictParams['version'],
+                'uri': dictParams['serverURL'],
+                'arch': 'any',
+                'dist': project,
+                'suite': suite,
+                'format': format,
+                }
+        host = getattr(self, 'pybitHostname', 'localhost')
+        port = getattr(self, 'pybitPort', 8091)
+        username = getattr(self, 'pybitUsername', 'admin')
+        password = getattr(self, 'pybitPassword', 'pass')
+        creds = (username, password)
 
         # add() acquires mutex lock.
         # caller is responsible for commiting the transaction.
         mutex.acquire()
         try:
-            suite, format = TYPE_SPECIFIERS[type_specifier]
-
-            data = {'package': dictParams['id'],
-                    'version': dictParams['version'],
-                    'uri': dictParams['serverURL'],
-                    'arch': 'any',
-                    'dist': project,
-                    'suite': suite,
-                    'format': format,
-                    }
-            host = getattr(self, 'pybitHostname', 'localhost')
-            port = getattr(self, 'pybitPort', 8091)
-            username = getattr(self, 'pybitUsername', 'admin')
-            password = getattr(self, 'pybitPassword', 'pass')
-            creds = (username, password)
             create_job(host, port, data, creds)
 
             # FIXME Removed due to inability to prioritize in a linear
