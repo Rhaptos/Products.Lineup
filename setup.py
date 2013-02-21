@@ -28,7 +28,7 @@ setup(name='Products.Lineup',
           'setuptools',
           'Products.ClockServer',
           'httplib2',
-          'simplejson',
+          ##'simplejson',
           # -*- Extra requirements: -*-
       ],
       entry_points="""
