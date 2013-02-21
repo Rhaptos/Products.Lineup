@@ -17,48 +17,12 @@
     <tr>
       <td align="left" valign="top">
       <div class="form-optional">
-      Workers per Server
-      </div>
-      </td>
-      <td align="left" valign="top">
-      <input type="text" name="dictServers" size="40" value=""
-             tal:attributes="value python:here.dictServers"/>
-          (Python dictionary which matches server names with maximum workers, for example {'smallServer':2, 'bigServer':4}.)
-      </td>
-    </tr>
-    <tr>
-      <td align="left" valign="top">
-      <div class="form-optional">
-      Process Window Timeouts
-      </div>
-      </td>
-      <td align="left" valign="top">
-      <input type="text" name="dictProcessWindows" size="40" value=""
-             tal:attributes="value python:here.secProcessWindows"/>
-          (Python dictionary which matches queue keys (and key classes) with maximum timeouts in seconds, for example {'collxml':120, 'colprint_col10001':7200}.)
-      </td>
-    </tr>
-    <tr>
-      <td align="left" valign="top">
-      <div class="form-optional">
-      Time Window in seconds
-      </div>
-      </td>
-      <td align="left" valign="top">
-      <input type="text" name="secProcessWindow" size="40" value=""
-             tal:attributes="value python:here.secProcessWindow"/>
-          Time Window in seconds, within which worker child process is expected to finish.
-      </td>
-    </tr>
-    <tr>
-      <td align="left" valign="top">
-      <div class="form-optional">
         PyBit hostname
       </div>
       </td>
       <td align="left" valign="top">
       <input type="text" name="pybitHostname" size="40" value=""
-             tal:attributes="value python:here.pybitHostname | nothing"/>
+             tal:attributes="value here/pybitHostname | nothing"/>
         The hostname for the CNX-PyBit enabled instance.
     </tr>
     <tr>
@@ -69,7 +33,7 @@
       </td>
       <td align="left" valign="top">
       <input type="text" name="pybitPort" size="40" value=""
-             tal:attributes="value python:here.pybitPort | nothing"/>
+             tal:attributes="value here/pybitPort | nothing"/>
         The port number for the CNX-PyBit enabled instance.
     </tr>
     <tr>
@@ -80,7 +44,7 @@
       </td>
       <td align="left" valign="top">
       <input type="text" name="pybitHostname" size="40" value=""
-             tal:attributes="value python:here.pybitUsername | nothing"/>
+             tal:attributes="value here/pybitUsername | nothing"/>
         The username for the CNX-PyBit enabled instance.
     </tr>
     <tr>
@@ -91,7 +55,7 @@
       </td>
       <td align="left" valign="top">
       <input type="password" name="pybitHostname" size="40" value=""
-             tal:attributes="value python:here.pybitPassword | nothing"/>
+             tal:attributes="value here/pybitPassword | nothing"/>
         The password for the CNX-PyBit enabled instance.
     </tr>
     <tr>
