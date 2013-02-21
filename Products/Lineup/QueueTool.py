@@ -59,7 +59,7 @@ def log(msg, severity=zLOG.INFO):
 # XXX Modified clone of rbit's rpush.create_job functionality.
 #     We are required to clone it because rpush is not backwards
 #     compatible and should not be dumbed down to do so.
-def create_job(host, port, creds=('admin', 'pass'), data):
+def create_job(host, port, data, creds=('admin', 'pass')):
     """Creates a job request in PyBit"""
     url = "http://%s:%s/api/job/" % (host, port)
     data = json.dumps(data)
@@ -195,12 +195,6 @@ class QueueTool(UniqueObject, SimpleItem):
         # Types of builds coming in are: colcomplete, colprint, colxml
         type_specifier = key.split('_', 1)[0].lstrip('col')
 
-        # XXX Temporary measure to incrementally develop the
-        #     message handlers that produces offline xml and complete zip.
-        if type_specifier in ('complete', 'xml'):
-            self.BBB_add(key, dictParams, callbackrequesthandler, priority=1)
-            return
-
         # add() acquires mutex lock.
         # caller is responsible for commiting the transaction.
         mutex.acquire()
@@ -220,7 +214,7 @@ class QueueTool(UniqueObject, SimpleItem):
             username = getattr(self, 'pybitUsername', 'admin')
             password = getattr(self, 'pybitPassword', 'pass')
             creds = (username, password)
-            create_job(host, port, creds, data)
+            create_job(host, port, data, creds)
 
             # FIXME Removed due to inability to prioritize in a linear
             #       (non-topic based) message queue implemenation.
