@@ -43,11 +43,14 @@ ManagePermission = 'View management screens'
 # the child at exit calls QueueTool.stop() which removes the request from processingRequests queue.
 
 
+# These are mappings from the key given to us by various pieces of the
+#   rhaptos codebase that we then map to suite and format values for
+#   the queueing system (pybit).
 TYPE_SPECIFIERS = {
     # type: (suite, format),
-    'complete': ('latex', 'completezip'),
-    'print': ('princexml', 'pdf'),
-    'lxml': ('latex', 'offline'),
+    'colcomplete': ('latex', 'completezip'),
+    'colprint': ('princexml', 'pdf'),
+    'collxml': ('latex', 'offline'),
     }
 
 mutex = Lock()
@@ -158,9 +161,11 @@ class QueueTool(UniqueObject, SimpleItem):
         # Types of builds coming in are: colcomplete, colprint, colxml
         build_type = key.split('_', 1)[0]
         col_or_mod = build_type[:3]  # either 'col' or 'mod''
-        type_specifier = key.split('_', 1)[0][3:]
+        type_specifier = key.split('_', 1)[0]
         suite, format = TYPE_SPECIFIERS[type_specifier]
 
+        # The data here maps web api setup in front of our queue state
+        #   manager (pybit)
         data = {'package': dictParams['id'],
                 'version': dictParams['version'],
                 'uri': dictParams['serverURL'],
@@ -175,32 +180,8 @@ class QueueTool(UniqueObject, SimpleItem):
         password = getattr(self, 'pybitPassword', 'pass')
         creds = (username, password)
 
-        # add() acquires mutex lock.
-        # caller is responsible for commiting the transaction.
-        mutex.acquire()
-        try:
-            create_job(host, port, data, creds)
-
-            # FIXME Removed due to inability to prioritize in a linear
-            #       (non-topic based) message queue implemenation.
-            # Walk list, insert immediately before first entry that is
-            #   lower priority (higher value)
-            ##dictRequest['priority'] = priority
-            ##for i,req in enumerate(self.pendingRequests):
-            ##    if req['priority'] > priority:
-            ##        self.pendingRequests.insert(i,req)
-            ##        break
-            ##else:
-            ##    # didn't find one, tack on the end
-            ##    self.pendingRequests.append(dictRequest)
-
-            # note that we explicitly and purposely do not commit the transaction here.
-            # the caller is likely to be in a module/collection publish transaction.
-            # when the caller's transaction commits, the QueueTool change (i.e. adding
-            # a request) will also commit.  thus, the request can not be processed until
-            # after the publish transaction has completed (i.e. no race condition).
-        finally:
-            mutex.release()
+        # FIXME This is not transaction aware.
+        create_job(host, port, data, creds)
 
     security.declarePrivate('find')
     def find(self, strKey, listRequests):
