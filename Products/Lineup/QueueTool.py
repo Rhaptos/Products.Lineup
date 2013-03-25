@@ -49,7 +49,7 @@ ManagePermission = 'View management screens'
 TYPE_SPECIFIERS = {
     # type: (suite, format),
     'colcomplete': ('latex', 'completezip'),
-    'colprint': ('princexml', 'pdf'),
+    'colprint': ('latex', 'pdf'),
     'collxml': ('latex', 'offline'),
     }
 
