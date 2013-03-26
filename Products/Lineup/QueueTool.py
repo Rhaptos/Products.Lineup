@@ -42,15 +42,15 @@ ManagePermission = 'View management screens'
 # which performs the work.  the child at startup calls QueueTool.start() which updates the request.
 # the child at exit calls QueueTool.stop() which removes the request from processingRequests queue.
 
-
 # These are mappings from the key given to us by various pieces of the
-#   rhaptos codebase that we then map to suite and format values for
-#   the queueing system (pybit).
-TYPE_SPECIFIERS = {
-    # type: (suite, format),
-    'colcomplete': ('latex', 'completezip'),
-    'colprint': ('princexml', 'pdf'),
-    'collxml': ('latex', 'offline'),
+#   rhaptos codebase that we then map a format values for the queueing
+#   system (pybit).
+FORMAT_FOR_BUILD_TYPES = {
+    # type: format,
+    'colcomplete': 'completezip',
+    'colprint': 'pdf',
+    'collxml': 'offline',
+    'modexport': 'offline',
     }
 
 mutex = Lock()
@@ -162,7 +162,8 @@ class QueueTool(UniqueObject, SimpleItem):
         build_type = key.split('_', 1)[0]
         col_or_mod = build_type[:3]  # either 'col' or 'mod''
         type_specifier = key.split('_', 1)[0]
-        suite, format = TYPE_SPECIFIERS[type_specifier]
+        suite = self._get_build_suite_from_params(dictParams)
+        format = FORMAT_FOR_BUILD_TYPES[type_specifier]
 
         # The data here maps web api setup in front of our queue state
         #   manager (pybit)
@@ -182,6 +183,28 @@ class QueueTool(UniqueObject, SimpleItem):
 
         # FIXME This is not transaction aware.
         create_job(host, port, data, creds)
+
+    def _get_build_suite_from_params(self, params):
+        """Get the build suite type using the params to lookup the object."""
+        id, version = params['id'], params['version']
+        portal = getToolByName(self, 'portal_url').getPortalObject()
+        repository = portal['content']
+        obj = repository.getRhaptosObject(id, version)
+
+        # Determine the build suite value using the print tool's
+        #   configured mappings. Fallback to latex if a print-style
+        #   has not been specified or no mapping is found.
+        default = 'latex'
+        print_style = obj.getParameters().get('printstyle', None)
+        if print_style is None:
+            return default
+        rhaptos_print = getToolByName(portal, 'rhaptos_print')
+        build_mappings = dict(rhaptos_print.getBuildMappings())
+        try:
+            suite = build_mappings[print_style]
+        except KeyError:
+            suite = default
+        return suite
 
     security.declarePrivate('find')
     def find(self, strKey, listRequests):
