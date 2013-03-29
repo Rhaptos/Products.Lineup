@@ -51,6 +51,7 @@ FORMAT_FOR_BUILD_TYPES = {
     'colprint': 'pdf',
     'collxml': 'offline',
     'modexport': 'offline',
+    'modprint': 'pdf',
     }
 
 mutex = Lock()
@@ -195,7 +196,10 @@ class QueueTool(UniqueObject, SimpleItem):
         #   configured mappings. Fallback to latex if a print-style
         #   has not been specified or no mapping is found.
         default = 'latex'
-        print_style = obj.getParameters().get('printstyle', None)
+        try:
+            print_style = obj.getParameters().get('printstyle', None)
+        except AttributeError:  # ...on getParameters
+            print_style = None
         if print_style is None:
             return default
         rhaptos_print = getToolByName(portal, 'rhaptos_print')
