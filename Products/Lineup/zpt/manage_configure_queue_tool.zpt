@@ -45,8 +45,8 @@
       </div>
       </td>
       <td align="left" valign="top">
-      <input type="text" name="secProcessWindow" size="40" value=""
-             tal:attributes="value python:here.secProcessWindow"/>
+      <input type="text" name="secDefaultProcessWindow" size="40" value=""
+             tal:attributes="value python:here.secDefaultProcessWindow"/>
           Time Window in seconds, within which worker child process is expected to finish.
       </td>
     </tr>
