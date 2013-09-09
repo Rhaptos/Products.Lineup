@@ -300,7 +300,9 @@ class QueueTool(UniqueObject, SimpleItem):
             for request in self.processingRequests:
                 timeProcessStarted = 'timeRequestProcessed' in request and request['timeRequestProcessed'] or None
                 childPid = request.get('pid') 
-                if childPid:
+                reqHostName = request.get('hostName')
+                myHostName = getfqdn()
+                if childPid and reqHostName == myHostName:
                     try:
                         os.kill(childPid, 0)
                     except OSError:
