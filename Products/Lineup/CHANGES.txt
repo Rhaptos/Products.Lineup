@@ -1,3 +1,9 @@
+Lineup-0.6
+  - fix case of more than one worker running jobs  on different servers (only cleanup your own jobs)
+
+Lineup-0.5.1
+  - config settings broken for new queue instances - default timeout renamed
+
 Lineup-0.5
   - move and modify dependency checking to avoid problem w/ spinning unmet dep request
 
